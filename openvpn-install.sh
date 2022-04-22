@@ -264,7 +264,7 @@ function installQuestions() {
 		SUGGESTION="y"
 	else
 		echo "Your host does not appear to have IPv6 connectivity."
-		SUGGESTION="n"
+		SUGGESTION="y"
 	fi
 	echo ""
 	# Ask the user if they want to enable IPv6 regardless its availability.
@@ -300,7 +300,7 @@ function installQuestions() {
 	echo "   1) UDP"
 	echo "   2) TCP"
 	until [[ $PROTOCOL_CHOICE =~ ^[1-2]$ ]]; do
-		read -rp "Protocol [1-2]: " -e -i 1 PROTOCOL_CHOICE
+		read -rp "Protocol [1-2]: " -e -i 2 PROTOCOL_CHOICE
 	done
 	case $PROTOCOL_CHOICE in
 	1)
@@ -326,7 +326,7 @@ function installQuestions() {
 	echo "   12) NextDNS (Anycast: worldwide)"
 	echo "   13) Custom"
 	until [[ $DNS =~ ^[0-9]+$ ]] && [ "$DNS" -ge 1 ] && [ "$DNS" -le 13 ]; do
-		read -rp "DNS [1-12]: " -e -i 11 DNS
+		read -rp "DNS [1-12]: " -e -i 9 DNS
 		if [[ $DNS == 2 ]] && [[ -e /etc/unbound/unbound.conf ]]; then
 			echo ""
 			echo "Unbound is already installed."
@@ -360,7 +360,7 @@ function installQuestions() {
 	until [[ $COMPRESSION_ENABLED =~ (y|n) ]]; do
 		read -rp"Enable compression? [y/n]: " -e -i n COMPRESSION_ENABLED
 	done
-	if [[ $COMPRESSION_ENABLED == "y" ]]; then
+	if [[ $COMPRESSION_ENABLED == "n" ]]; then
 		echo "Choose which compression algorithm you want to use: (they are ordered by efficiency)"
 		echo "   1) LZ4-v2"
 		echo "   2) LZ4"
@@ -391,7 +391,7 @@ function installQuestions() {
 	done
 	if [[ $CUSTOMIZE_ENC == "n" ]]; then
 		# Use default, sane and fast parameters
-		CIPHER="AES-128-GCM"
+		CIPHER="AES-256-CBC"
 		CERT_TYPE="1" # ECDSA
 		CERT_CURVE="prime256v1"
 		CC_CIPHER="TLS-ECDHE-ECDSA-WITH-AES-128-GCM-SHA256"
@@ -409,7 +409,7 @@ function installQuestions() {
 		echo "   5) AES-192-CBC"
 		echo "   6) AES-256-CBC"
 		until [[ $CIPHER_CHOICE =~ ^[1-6]$ ]]; do
-			read -rp "Cipher [1-6]: " -e -i 1 CIPHER_CHOICE
+			read -rp "Cipher [1-6]: " -e -i 6 CIPHER_CHOICE
 		done
 		case $CIPHER_CHOICE in
 		1)
@@ -436,7 +436,7 @@ function installQuestions() {
 		echo "   1) ECDSA (recommended)"
 		echo "   2) RSA"
 		until [[ $CERT_TYPE =~ ^[1-2]$ ]]; do
-			read -rp"Certificate key type [1-2]: " -e -i 1 CERT_TYPE
+			read -rp"Certificate key type [1-2]: " -e -i 2 CERT_TYPE
 		done
 		case $CERT_TYPE in
 		1)
@@ -489,7 +489,7 @@ function installQuestions() {
 			echo "   1) ECDHE-ECDSA-AES-128-GCM-SHA256 (recommended)"
 			echo "   2) ECDHE-ECDSA-AES-256-GCM-SHA384"
 			until [[ $CC_CIPHER_CHOICE =~ ^[1-2]$ ]]; do
-				read -rp"Control channel cipher [1-2]: " -e -i 1 CC_CIPHER_CHOICE
+				read -rp"Control channel cipher [1-2]: " -e -i 2 CC_CIPHER_CHOICE
 			done
 			case $CC_CIPHER_CHOICE in
 			1)
@@ -776,10 +776,12 @@ function installOpenVPN() {
 	echo "dev tun
 user nobody
 group $NOGROUP
-persist-key
+;persist-key
 persist-tun
 keepalive 10 120
-topology subnet
+;topology subnet
+client-to-client
+duplicate-cn
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt" >>/etc/openvpn/server.conf
 
@@ -796,7 +798,7 @@ ifconfig-pool-persist ipp.txt" >>/etc/openvpn/server.conf
 		# Obtain the resolvers from resolv.conf and use them for OpenVPN
 		sed -ne 's/^nameserver[[:space:]]\+\([^[:space:]]\+\).*$/\1/p' $RESOLVCONF | while read -r line; do
 			# Copy, if it's a IPv4 |or| if IPv6 is enabled, IPv4/IPv6 does not matter
-			if [[ $line =~ ^[0-9.]*$ ]] || [[ $IPV6_SUPPORT == 'y' ]]; then
+			if [[ $line =~ ^[0-9.]*$ ]] || [[ $IPV6_SUPPORT == 'n' ]]; then
 				echo "push \"dhcp-option DNS $line\"" >>/etc/openvpn/server.conf
 			fi
 		done
@@ -871,30 +873,30 @@ push "redirect-gateway ipv6"' >>/etc/openvpn/server.conf
 
 	if [[ $DH_TYPE == "1" ]]; then
 		echo "dh none" >>/etc/openvpn/server.conf
-		echo "ecdh-curve $DH_CURVE" >>/etc/openvpn/server.conf
+		echo ";ecdh-curve $DH_CURVE" >>/etc/openvpn/server.conf
 	elif [[ $DH_TYPE == "2" ]]; then
 		echo "dh dh.pem" >>/etc/openvpn/server.conf
 	fi
 
 	case $TLS_SIG in
 	1)
-		echo "tls-crypt tls-crypt.key" >>/etc/openvpn/server.conf
+		echo ";tls-crypt tls-crypt.key" >>/etc/openvpn/server.conf
 		;;
 	2)
-		echo "tls-auth tls-auth.key 0" >>/etc/openvpn/server.conf
+		echo ";tls-auth tls-auth.key 0" >>/etc/openvpn/server.conf
 		;;
 	esac
 
-	echo "crl-verify crl.pem
+	echo ";crl-verify crl.pem
 ca ca.crt
 cert $SERVER_NAME.crt
 key $SERVER_NAME.key
-auth $HMAC_ALG
+;auth $HMAC_ALG
 cipher $CIPHER
-ncp-ciphers $CIPHER
-tls-server
-tls-version-min 1.2
-tls-cipher $CC_CIPHER
+;ncp-ciphers $CIPHER
+;tls-server
+;tls-version-min 1.2
+;tls-cipher $CC_CIPHER
 client-config-dir /etc/openvpn/ccd
 status /var/log/openvpn/status.log
 verb 3" >>/etc/openvpn/server.conf
@@ -1026,7 +1028,7 @@ WantedBy=multi-user.target" >/etc/systemd/system/iptables-openvpn.service
 		echo "proto udp" >>/etc/openvpn/client-template.txt
 		echo "explicit-exit-notify" >>/etc/openvpn/client-template.txt
 	elif [[ $PROTOCOL == 'tcp' ]]; then
-		echo "proto tcp-client" >>/etc/openvpn/client-template.txt
+		echo "proto tcp" >>/etc/openvpn/client-template.txt
 	fi
 	echo "remote $IP $PORT
 dev tun
@@ -1035,15 +1037,11 @@ nobind
 persist-key
 persist-tun
 remote-cert-tls server
-verify-x509-name $SERVER_NAME name
 auth $HMAC_ALG
 auth-nocache
 cipher $CIPHER
-tls-client
-tls-version-min 1.2
-tls-cipher $CC_CIPHER
 ignore-unknown-option block-outside-dns
-setenv opt block-outside-dns # Prevent Windows 10 DNS leak
+setenv opt block-outside-dns
 verb 3" >>/etc/openvpn/client-template.txt
 
 	if [[ $COMPRESSION_ENABLED == "y" ]]; then
