@@ -1,4 +1,4 @@
-# openvpn-install
+# openvpn-mikrotik-install
 
 ![Test](https://github.com/angristan/openvpn-install/workflows/Test/badge.svg)
 ![Lint](https://github.com/angristan/openvpn-install/workflows/Lint/badge.svg)
@@ -16,7 +16,7 @@ You can also check out [wireguard-install](https://github.com/angristan/wireguar
 First, get the script and make it executable:
 
 ```bash
-curl -O https://raw.githubusercontent.com/angristan/openvpn-install/master/openvpn-install.sh
+curl -O https://github.com/ADMiNZ/openvpn-mikrotik-install/raw/master/openvpn-install.sh
 chmod +x openvpn-install.sh
 ```
 
